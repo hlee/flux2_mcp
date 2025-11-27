@@ -18,25 +18,23 @@ except ImportError:
     sys.exit(1)
 
 def generate_image(prompt, width=1024, height=768, seed=42):
-    """Generate an image using Flux API"""
-    url = f"{BASE_URL}/flux/v1/{MODEL}"
+    """Generate an image using Flux API via Replicate endpoint"""
+    # Use Replicate-compatible endpoint which works with CometAPI
+    url = f"{BASE_URL}/replicate/v1/models/black-forest-labs/{MODEL}/predictions"
     
     headers = {
-        "Authorization": API_KEY,
+        "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
     
     payload = {
-        "prompt": prompt,
-        "image_prompt": "",
-        "width": width,
-        "height": height,
-        "prompt_upsampling": False,
-        "seed": seed,
-        "safety_tolerance": 2,
-        "output_format": "jpeg",
-        "webhook_url": "",
-        "webhook_secret": ""
+        "input": {
+            "prompt": prompt,
+            "width": width,
+            "height": height,
+            "num_outputs": 1,
+            "seed": seed
+        }
     }
     
     print(f"🚀 Generating image with prompt: '{prompt}'")
@@ -45,13 +43,13 @@ def generate_image(prompt, width=1024, height=768, seed=42):
     try:
         response = requests.post(url, headers=headers, json=payload)
         print(f"📊 Status Code: {response.status_code}")
-        print(f"📄 Response: {response.text[:500]}")
         
-        if response.status_code == 200:
+        if response.status_code == 200 or response.status_code == 201:
             data = response.json()
             task_id = data.get("id")
             print(f"✅ Task created successfully!")
             print(f"🆔 Task ID: {task_id}")
+            print(f"📄 Status: {data.get('status')}")
             return task_id
         else:
             print(f"❌ Error: {response.status_code}")
@@ -63,47 +61,69 @@ def generate_image(prompt, width=1024, height=768, seed=42):
         return None
 
 def get_result(task_id, max_attempts=30, poll_interval=2):
-    """Poll for image generation result"""
-    url = f"{BASE_URL}/flux/v1/get_result"
+    """Poll for image generation result using Replicate endpoint"""
+    url = f"{BASE_URL}/replicate/v1/predictions/{task_id}"
     
     headers = {
-        "Authorization": API_KEY
-    }
-    
-    params = {
-        "id": task_id
+        "Authorization": f"Bearer {API_KEY}"
     }
     
     print(f"\n⏳ Polling for results (Task ID: {task_id})")
     
     for attempt in range(max_attempts):
         try:
-            response = requests.get(url, headers=headers, params=params)
+            response = requests.get(url, headers=headers)
             
             if response.status_code == 200:
                 data = response.json()
-                status = data.get("status")
                 
-                print(f"📊 Attempt {attempt + 1}/{max_attempts} - Status: {status}")
-                
-                if status == "Ready":
-                    print(f"\n✅ Image generation complete!")
-                    result = data.get("result", {})
-                    image_url = result.get("sample")
-                    duration = result.get("duration")
+                # Handle CometAPI response format
+                if "data" in data and "status" in data["data"]:
+                    status = data["data"]["status"]
+                    progress = data["data"].get("progress", "")
                     
-                    print(f"🖼️  Image URL: {image_url}")
-                    print(f"⏱️  Duration: {duration}s")
-                    print(f"🌱 Seed: {result.get('seed')}")
+                    print(f"📊 Attempt {attempt + 1}/{max_attempts} - Status: {status} {progress}")
                     
-                    return data
-                    
-                elif status in ["Error", "Failed"]:
-                    print(f"❌ Generation failed: {data}")
-                    return None
-                    
+                    if status == "SUCCESS":
+                        print(f"\n✅ Image generation complete!")
+                        result_data = data["data"]["data"]
+                        output = result_data.get("output", [])
+                        
+                        if output:
+                            image_url = output[0] if isinstance(output, list) else output
+                            print(f"🖼️  Image URL: {image_url}")
+                        
+                        logs = result_data.get("logs", "")
+                        if "Generation took" in logs:
+                            duration_line = [l for l in logs.split("\n") if "Generation took" in l]
+                            if duration_line:
+                                print(f"⏱️  {duration_line[0]}")
+                        
+                        return data
+                        
+                    elif status in ["FAILED"]:
+                        print(f"❌ Generation failed: {data}")
+                        return None
+                        
+                    else:
+                        time.sleep(poll_interval)
                 else:
-                    time.sleep(poll_interval)
+                    # Fallback to standard Replicate format
+                    status = data.get("status")
+                    print(f"📊 Attempt {attempt + 1}/{max_attempts} - Status: {status}")
+                    
+                    if status in ["succeeded", "completed"]:
+                        print(f"\n✅ Image generation complete!")
+                        output = data.get("output", [])
+                        if output:
+                            image_url = output[0] if isinstance(output, list) else output
+                            print(f"🖼️  Image URL: {image_url}")
+                        return data
+                    elif status in ["failed", "canceled"]:
+                        print(f"❌ Generation failed: {data}")
+                        return None
+                    else:
+                        time.sleep(poll_interval)
                     
             else:
                 print(f"❌ Error polling: {response.status_code}")
