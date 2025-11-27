@@ -52,19 +52,37 @@ Features:
 - Configurable aspect ratios (1:1, 16:9, etc.)
 - Base64 image output
 
-### Flux Image Generation
+### Flux Image Generation (CometAPI)
 
-Generate images using Flux model:
+Generate images using Flux model via CometAPI's Replicate endpoint:
 
 ```bash
 python3 test-flux-api.py
 ```
 
 Features:
-- Text-to-image generation
+- Text-to-image generation via Replicate-compatible endpoint
 - Asynchronous with polling
 - Configurable dimensions and seed
 - URL-based image output
+
+### FLUX.2 Image Generation (BFL Direct API)
+
+Generate images using FLUX.2 models directly from Black Forest Labs:
+
+```bash
+export BFL_API_KEY="your-bfl-api-key-here"
+python3 test-flux2-bfl-api.py
+```
+
+Features:
+- FLUX.2 [pro] - Fast production model (~6s generation)
+- FLUX.2 [flex] - High quality with adjustable steps and guidance
+- Direct BFL API integration
+- Photorealistic output with accurate colors (hex code support)
+- Configurable dimensions, seed, steps, and guidance
+
+Get your BFL API key from [BFL Dashboard](https://api.bfl.ai/)
 
 ## Documentation
 
@@ -84,7 +102,9 @@ The `.gitignore` file is configured to exclude:
 ## Files
 
 - `test-gemini-image-api.py` - Gemini image generation script
-- `test-flux-api.py` - Flux image generation script
+- `test-flux-api.py` - Flux image generation script (CometAPI)
+- `test-flux2-bfl-api.py` - FLUX.2 image generation script (BFL Direct API)
+- `test-api-key.py` - API key diagnostic tool
 - `config.example.py` - Configuration template
 - `config.py` - Your actual config (not committed)
 
@@ -96,8 +116,9 @@ Generated images are saved as:
 
 ## API Models
 
-- **Gemini**: `gemini-2.5-flash-image`
-- **Flux**: `flux-dev`
+- **Gemini**: `gemini-2.5-flash-image` (CometAPI)
+- **Flux**: `flux-dev` (CometAPI via Replicate endpoint)
+- **FLUX.2**: `flux-2-pro`, `flux-2-flex` (BFL Direct API)
 
 ## License
 
