@@ -5,8 +5,15 @@ Tests different authentication formats and endpoints
 """
 
 import requests
+import sys
 
-API_KEY = "YOUR_API_KEY_HERE"  # Replace with your actual API key
+# Import configuration
+try:
+    from config import API_KEY
+except ImportError:
+    print("❌ Error: config.py not found!")
+    print("Please copy config.example.py to config.py and add your API key")
+    sys.exit(1)
 
 # Test different authentication formats
 auth_formats = [
